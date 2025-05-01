@@ -10,6 +10,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~4.0.1",
     "@react-native-async-storage/async-storage": "^1.24.0",
     "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-community/slider": "^4.5.6",
@@ -19,7 +20,7 @@
     "@react-navigation/drawer": "^7.1.1",
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/stack": "^7.1.1",
-    "expo": "~52.0.35",
+    "expo": "^52.0.46",
     "expo-location": "~18.0.7",
     "expo-status-bar": "~2.0.1",
     "firebase": "^11.6.0",
@@ -27,20 +28,35 @@
     "moment-hijri": "^3.0.0",
     "moment-timezone": "^0.5.48",
     "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-native": "0.76.7",
     "react-native-gesture-handler": "~2.20.2",
     "react-native-linear-gradient": "^2.8.3",
-    "react-native-maps": "^1.18.0",
+    "react-native-maps": "3.6.0",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-paper": "^5.13.1",
     "react-native-reanimated": "~3.16.1",
     "react-native-safe-area-context": "^5.2.0",
     "react-native-screens": "^4.8.0",
     "react-native-vector-icons": "^10.2.0",
+    "react-native-web": "~0.19.13",
     "react-native-wheel-picker": "^1.2.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "metro": "^0.82.1",
+    "metro-config": "^0.82.1"
   },
-  "private": true
+  "private": true,
+  "description": "��#\u0000 \u0000W\u0000a\u0000r\u0000e\u0000e\u0000d\u0000\r\u0000 \u0000",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Theryu22/Wareed.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/Theryu22/Wareed/issues"
+  },
+  "homepage": "https://github.com/Theryu22/Wareed#readme"
 }

@@ -7,6 +7,8 @@ export const UserProvider = ({ children }) => {
   const [userName, setUserName] = useState("");
   const [bloodType, setBloodType] = useState("");
   const [age, setAge] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
   
   // Language state (default to Arabic)
   const [language, setLanguage] = useState('ar');

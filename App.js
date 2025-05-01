@@ -4,6 +4,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import GoogleMapScreen from "./src/screens/GoogleMapScreen";
 import SignInScreen from "./src/screens/SignInScreen";
+import SignUpScreen from "./src/screens/SignUpScreen";
 import UserFormScreen from "./src/screens/UserFormScreen";
 import DonateScreen from "./src/screens/DonateScreen"; // Example screen
 import UrgencyDetailsScreen from "./src/screens/UrgencyDetailsScreen"; // Example screen
@@ -40,6 +41,7 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="SignIn" component={SignInScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="UserForm" component={UserFormScreen} />
           <Stack.Screen name="MainApp" component={MainApp} />
         </Stack.Navigator>

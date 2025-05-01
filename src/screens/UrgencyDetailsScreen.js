@@ -33,10 +33,14 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
   const { userName, bloodType } = useContext(UserContext);
   const { urgency } = route.params;
 
+  
   const [isTimeModalVisible, setIsTimeModalVisible] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isClinicOpen, setIsClinicOpen] = useState(false);
+  const [isBookingEnabled, setIsBookingEnabled] = useState(true); // للتحكم في تفعيل الحجز ينفعنا وقت نبي نسوي تست نقفله على كل اليوزرات اذا سوينا ادمن
+  const [overrideClinicHours, setOverrideClinicHours] = useState(false); // يسمح بتجاوز الوقت
+
 
   const generateTicketCode = () => {
     return Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -143,9 +147,14 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
 
   const handleDonatePress = (request) => {
     setSelectedRequest(request);
+
+    if (!isBookingEnabled) {
+      Alert.alert("الحجز غير متاح", "تم إغلاق الحجز مؤقتًا للتجربة.");
+      return;
+    }
     const isOpen = checkClinicHours();
     
-    if (!isOpen) {
+    if (!isOpen && !overrideClinicHours) {
       const now = new Date();
       const saudiOffset = 3 * 60 * 60 * 1000;
       const saudiTime = new Date(now.getTime() + saudiOffset);

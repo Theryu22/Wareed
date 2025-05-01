@@ -3,6 +3,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 
 // Import your screens
 import SignInScreen from "../screens/SignInScreen";
+import SignUpScreen from "./src/screens/SignUpScreen";
 import UserFormScreen from "../screens/UserFormScreen";
 import GoogleMapScreen from "../screens/GoogleMapScreen";
 import DonateScreen from "../screens/DonateScreen";
@@ -28,6 +29,11 @@ export default function StackNavigator() {
       <Stack.Screen 
         name="SignIn" 
         component={SignInScreen} 
+        options={{ header: () => null }} // Additional safety
+      />
+       <Stack.Screen 
+        name="SignUp" 
+        component={SignUpScreen} 
         options={{ header: () => null }} // Additional safety
       />
       <Stack.Screen 
