@@ -1,9 +1,8 @@
-// SignUpScreen.js
 import React, { useState, useEffect } from 'react';
 import { 
   SafeAreaView, 
   ScrollView, 
-  KeyboardAvoidingView, // لازم يكون موجود معه البلاتفورم على اساس يشتغل
+  KeyboardAvoidingView,
   Platform,
   View, 
   Text, 
@@ -18,6 +17,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../firebaseConfig'; // Import Firebase authentication
 import { createUserWithEmailAndPassword } from "firebase/auth"; // Firebase Auth methods
+import { getDatabase, ref, set } from "firebase/database"; // Import Database methods
 
 export default function SignUpScreen() {
   const navigation = useNavigation();  // Set up navigation
@@ -79,7 +79,7 @@ export default function SignUpScreen() {
           tension: 100,
           useNativeDriver: true,
         })
-      ]),
+      ]), 
       Animated.timing(formOpacity, {
         toValue: 1,
         duration: 800,
@@ -110,11 +110,24 @@ export default function SignUpScreen() {
     setIsLoading(true);
 
     try {
+      // Step 1: Create user using Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
       console.log("User signed up successfully: ", userCredential.user);
+
+      // Step 2: Store additional user data in Realtime Database
+      const user = userCredential.user;
+      const db = getDatabase();
+      const userRef = ref(db, 'users/' + user.uid); // Using user.uid as the key
+
+      await set(userRef, {
+        email: form.email,       // Store email
+        isAdmin: false,          // Default to false, unless you need to change this
+        uid: user.uid,           // Store uid
+      });
+
       setIsLoading(false);
 
-      // Redirect to SignIn screen after successful SignUp
+      // Step 3: Redirect to SignIn screen after successful SignUp
       navigation.replace('SignIn'); // Replace current screen with SignIn
     } catch (error) {
       setIsLoading(false);
@@ -124,64 +137,62 @@ export default function SignUpScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-                  >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+      >
+        <ScrollView contentContainerStyle={styles.scrollViewContainer} keyboardShouldPersistTaps="handled">
+          <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Sign Up</Text>
+            </View>
 
-     <ScrollView contentContainerStyle={styles.scrollViewContainer}
-      keyboardShouldPersistTaps="handled">
-       <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Sign Up</Text>
-        </View>
+            <Animated.View style={[styles.form, { opacity: formOpacity }]}>
+              <View style={styles.input}>
+                <Text style={styles.inputLabel}>Email address</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  onChangeText={email => setForm({ ...form, email })}
+                  placeholder="john@example.com"
+                  style={styles.inputControl}
+                  value={form.email}
+                />
+              </View>
 
-        <Animated.View style={[styles.form, { opacity: formOpacity }]}>
-          <View style={styles.input}>
-            <Text style={styles.inputLabel}>Email address</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              onChangeText={email => setForm({ ...form, email })}
-              placeholder="john@example.com"
-              style={styles.inputControl}
-              value={form.email}
-            />
-          </View>
+              <View style={styles.input}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  secureTextEntry
+                  onChangeText={password => setForm({ ...form, password })}
+                  placeholder="***********"
+                  style={styles.inputControl}
+                  value={form.password}
+                />
+              </View>
 
-          <View style={styles.input}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              secureTextEntry
-              onChangeText={password => setForm({ ...form, password })}
-              placeholder="***********"
-              style={styles.inputControl}
-              value={form.password}
-            />
-          </View>
+              <View style={styles.input}>
+                <Text style={styles.inputLabel}>Confirm Password</Text>
+                <TextInput
+                  secureTextEntry
+                  onChangeText={confirmPassword => setForm({ ...form, confirmPassword })}
+                  placeholder="***********"
+                  style={styles.inputControl}
+                  value={form.confirmPassword}
+                />
+              </View>
 
-          <View style={styles.input}>
-            <Text style={styles.inputLabel}>Confirm Password</Text>
-            <TextInput
-              secureTextEntry
-              onChangeText={confirmPassword => setForm({ ...form, confirmPassword })}
-              placeholder="***********"
-              style={styles.inputControl}
-              value={form.confirmPassword}
-            />
-          </View>
+              <TouchableOpacity onPress={handleSignUp} style={styles.btn} disabled={isLoading}>
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign Up</Text>}
+              </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleSignUp} style={styles.btn} disabled={isLoading}>
-            {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign Up</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => navigation.navigate('SignIn')} style={styles.link}>
-            <Text style={styles.linkText}>Already have an account? Sign In</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
-      </ScrollView>
+              <TouchableOpacity onPress={() => navigation.navigate('SignIn')} style={styles.link}>
+                <Text style={styles.linkText}>Already have an account? Sign In</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -189,8 +200,8 @@ export default function SignUpScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#1a1a2e' },
-  keyboardAvoidingView: {flex: 1,},
-  scrollViewContainer: { flexGrow: 1, justifyContent: 'center' },  // Ensures scrolling works
+  keyboardAvoidingView: {flex: 1, },
+  scrollViewContainer: { flexGrow: 1, justifyContent: 'center' },
   container: { padding: 24, flexGrow: 1, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: 36 },
   title: { fontSize: 32, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },

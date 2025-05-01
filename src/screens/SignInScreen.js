@@ -1,5 +1,4 @@
-// SignInScreen.js (Update with reset password feature)
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   StyleSheet, 
   SafeAreaView, 
@@ -17,11 +16,14 @@ import {
   Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { auth } from '../firebaseConfig'; // Import Firebase authentication
+import { auth, database } from '../firebaseConfig'; // التأكد من استيراد database بشكل صحيح
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"; // Firebase Auth methods
+import { ref, get } from 'firebase/database'; // لاستيراد الطرق للتعامل مع Realtime Database
+import { UserContext } from '../context/UserContext'; // استيراد UserContext
 
 export default function SignInScreen() {
   const navigation = useNavigation();
+  const { setUserName, setBloodType, setAge } = useContext(UserContext);
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -32,66 +34,60 @@ export default function SignInScreen() {
   const fadeAnim = useState(new Animated.Value(0))[0];
   const slideUpAnim = useState(new Animated.Value(30))[0];
   const logoScaleAnim = useState(new Animated.Value(0.5))[0];
-  const logoSkewAnim = useState(new Animated.Value(0))[0];
+  const logoSkewAnim = useState(new Animated.Value('0deg'))[0]; // Changed to use degrees
   const formOpacity = useState(new Animated.Value(0))[0];
   const buttonScale = useState(new Animated.Value(0.9))[0];
 
   useEffect(() => {
     // Entrance animations
-    Animated.parallel([
-      // Fade in animation
+    Animated.parallel([ 
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 1000,
         useNativeDriver: true,
       }),
-      // Slide up animation
       Animated.timing(slideUpAnim, {
         toValue: 0,
         duration: 1000,
         easing: Easing.out(Easing.back(1.5)),
         useNativeDriver: true,
       }),
-      // Logo scale animation
       Animated.spring(logoScaleAnim, {
         toValue: 1,
         friction: 5,
         tension: 60,
         useNativeDriver: true,
       }),
-      // Logo skew animation (oblique effect)
       Animated.sequence([
         Animated.timing(logoSkewAnim, {
-          toValue: 0.3,
+          toValue: '30deg', // Changed to use degrees
           duration: 300,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(logoSkewAnim, {
-          toValue: -0.1,
+          toValue: '-10deg', // Changed to use degrees
           duration: 200,
           useNativeDriver: true,
         }),
         Animated.timing(logoSkewAnim, {
-          toValue: 0.15,
+          toValue: '15deg', // Changed to use degrees
           duration: 150,
           useNativeDriver: true,
         }),
         Animated.spring(logoSkewAnim, {
-          toValue: 0,
+          toValue: '0deg', // Changed to use degrees
           friction: 5,
           tension: 100,
           useNativeDriver: true,
         })
       ]),
-      // Form fade in (delayed)
       Animated.timing(formOpacity, {
         toValue: 1,
         duration: 800,
         delay: 400,
         useNativeDriver: true,
       }),
-      // Button scale animation
       Animated.spring(buttonScale, {
         toValue: 1,
         delay: 600,
@@ -101,6 +97,35 @@ export default function SignInScreen() {
       })
     ]).start();
   }, []);
+
+  const loadUserData = async (user) => {
+    const db = database;
+
+    // تحميل بيانات المستخدم الشخصية من `Info/{user.uid}`
+    const userRef = ref(db, 'Info/' + user.uid);
+    const snapshot = await get(userRef);
+
+    if (snapshot.exists()) {
+      const userData = snapshot.val();
+
+      // تخزين البيانات في UserContext
+      setUserName(userData.name);
+      setBloodType(userData.bloodType);
+      setAge(userData.age);
+
+      // التحقق من اكتمال البيانات الشخصية
+      if (userData.name && userData.bloodType && userData.age) {
+        // توجيه المستخدم إلى MainApp إذا كانت البيانات مكتملة
+        navigation.replace('MainApp');
+      } else {
+        // إذا كانت البيانات غير مكتملة، توجيههم إلى UserForm
+        navigation.replace('UserForm');
+      }
+    } else {
+      console.log("لا توجد بيانات شخصية للمستخدم.");
+      navigation.replace('UserForm');
+    }
+  };
 
   const handleSignIn = () => {
     if (!form.email.trim()) {
@@ -139,11 +164,12 @@ export default function SignInScreen() {
 
     // Firebase Authentication
     signInWithEmailAndPassword(auth, form.email, form.password)
-      .then((userCredential) => {
-        setIsLoading(false);
+      .then(async (userCredential) => {
         const user = userCredential.user;
         console.log("User signed in: ", user);
-        navigation.replace('UserForm'); // Redirect to UserForm screen after sign-in
+
+        // جلب بيانات المستخدم بعد تسجيل الدخول
+        await loadUserData(user);  // جلب البيانات من قاعدة البيانات
       })
       .catch((error) => {
         setIsLoading(false);
@@ -169,7 +195,7 @@ export default function SignInScreen() {
   const shakeAnimation = () => {
     const shake = new Animated.Value(0);
 
-    Animated.sequence([
+    Animated.sequence([ 
       Animated.timing(shake, { toValue: 10, duration: 50, useNativeDriver: true }),
       Animated.timing(shake, { toValue: -10, duration: 50, useNativeDriver: true }),
       Animated.timing(shake, { toValue: 10, duration: 50, useNativeDriver: true }),
@@ -180,14 +206,8 @@ export default function SignInScreen() {
   };
 
   const handleSignUp = () => {
-    navigation.navigate('SignUp')
+    navigation.navigate('SignUp');
   };
-
-  // Skew transform for oblique effect
-  const logoSkewX = logoSkewAnim.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-30deg', '30deg']
-  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -200,62 +220,28 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Animated.View 
-            style={[
-              styles.container,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideUpAnim }]
-              }
-            ]}
+            style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
           >
             <View style={styles.header}>
               <Animated.Image
                 alt="App Logo"
                 resizeMode="contain"
-                style={[
-                  styles.headerImg,
-                  {
-                    transform: [
-                      { scale: logoScaleAnim },
-                      { skewX: logoSkewX }
-                    ]
-                  }
-                ]}
-                source={require('C:/Users/tntna/FirstProject/src/pic/Wareed_logoo.png')}             
-                   accessibilityLabel="Wareed Logo"
+                style={[styles.headerImg, { transform: [{ scale: logoScaleAnim }, { skewX: logoSkewAnim }] }]}
+                source={require('../pic/Wareed_logoo.png')}             
               />
               <Animated.Text 
-                style={[
-                  styles.title,
-                  { 
-                    opacity: fadeAnim,
-                    transform: [{ translateY: slideUpAnim }]
-                  }
-                ]}
+                style={[styles.title, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
               >
                 Sign in to <Text style={styles.titleHighlight}>Wareed</Text>
               </Animated.Text>
               <Animated.Text 
-                style={[
-                  styles.subtitle,
-                  { 
-                    opacity: fadeAnim,
-                    transform: [{ translateY: slideUpAnim }]
-                  }
-                ]}
+                style={[styles.subtitle, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
               >
                 قم بالتسجيل لسهولة الوصول لحسابك الشخصي في وريد
               </Animated.Text>
             </View>
 
-            <Animated.View 
-              style={[
-                styles.form,
-                { 
-                  opacity: formOpacity,
-                }
-              ]}
-            >
+            <Animated.View style={[styles.form, { opacity: formOpacity }]}>
               <View style={styles.input}>
                 <Text style={styles.inputLabel}>Email address</Text>
                 <TextInput
@@ -268,8 +254,6 @@ export default function SignInScreen() {
                   placeholderTextColor="#92929D"
                   style={styles.inputControl}
                   value={form.email}
-                  accessibilityLabel="Email input"
-                  accessibilityHint="Enter your email address"
                 />
               </View>
 
@@ -284,8 +268,6 @@ export default function SignInScreen() {
                   style={styles.inputControl}
                   secureTextEntry={true}
                   value={form.password}
-                  accessibilityLabel="Password input"
-                  accessibilityHint="Enter your password"
                 />
               </View>
 
@@ -335,7 +317,6 @@ export default function SignInScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -381,7 +362,6 @@ const styles = StyleSheet.create({
     width: 200,
     height: 100,
     marginBottom: 24,
-    transform: [{ skewX: '0deg' }], // Initial skew value
   },
   form: {
     width: '100%',
@@ -458,6 +438,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#fff',
-    letterSpacing: 0.5,
-  },
+    letterSpacing: 0.5,
+  },
 });

@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { UserContext } from "../context/UserContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuth, deleteUser } from "firebase/auth"; // استيراد دالة حذف الحساب
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -76,11 +77,32 @@ export default function SettingsScreen() {
         },
         { 
           text: "حذف الحساب", 
-          onPress: () => console.log("Account deleted"),
+          onPress: async () => await deleteAccount(),
           style: "destructive" 
         },
       ]
     );
+  };
+
+  // Function to delete user account
+  const deleteAccount = async () => {
+    const auth = getAuth(); // Get current user authentication
+    const user = auth.currentUser; // Get current signed-in user
+
+    if (user) {
+      try {
+        // Delete the user
+        await deleteUser(user);
+        Alert.alert("تم حذف الحساب", "تم حذف حسابك بنجاح.");
+        // Redirect to SignIn page after deletion
+        navigation.replace('SignIn');
+      } catch (error) {
+        Alert.alert("خطأ", "تعذر حذف الحساب. الرجاء المحاولة لاحقاً.");
+        console.error("Error deleting user:", error);
+      }
+    } else {
+      Alert.alert("خطأ", "لم يتم العثور على المستخدم الحالي.");
+    }
   };
 
   return (

@@ -1,8 +1,10 @@
 import React, { useState, useContext } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform , ActivityIndicator  } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { UserContext } from "../context/UserContext";
 import { Picker } from '@react-native-picker/picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { ref, set } from "firebase/database"; // تأكد من أنك تستورد set و ref لحفظ البيانات
+import { database, auth } from '../firebaseConfig'; // تأكد من استيراد قاعدة البيانات بشكل صحيح
 
 export default function UserFormScreen({ navigation }) {
   const { setUserName, setBloodType, setAge } = useContext(UserContext);
@@ -13,7 +15,7 @@ export default function UserFormScreen({ navigation }) {
 
   const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
     
     // Arabic validation messages
@@ -42,22 +44,41 @@ export default function UserFormScreen({ navigation }) {
       return;
     }
 
-    // Set user data
+    // Set user data to context
     setUserName(name.trim());
     setBloodType(selectedBloodType);
     setAge(ageNum.toString());
 
-    // Arabic success message
-    Alert.alert(
-      "تم بنجاح",
-      "تم حفظ معلوماتك بنجاح",
-      [
-        {
-          text: "تم",
-          onPress: () => navigation.replace("MainApp")
-        }
-      ]
-    );
+    // Save user data to Firebase Realtime Database
+    try {
+      const userId = auth.currentUser.uid; // الحصول على ال UID الخاص بالمستخدم
+      const userRef = ref(database, 'Info/' + userId);
+
+      // استخدام set لتخزين البيانات في قاعدة البيانات
+      await set(userRef, {
+        name: name.trim(),
+        bloodType: selectedBloodType,
+        age: ageNum.toString(),
+      });
+
+      setIsSubmitting(false);
+
+      // Arabic success message
+      Alert.alert(
+        "تم بنجاح",
+        "تم حفظ معلوماتك بنجاح",
+        [
+          {
+            text: "تم",
+            onPress: () => navigation.replace("MainApp") // توجيه المستخدم إلى الصفحة الرئيسية
+          }
+        ]
+      );
+    } catch (error) {
+      setIsSubmitting(false);
+      Alert.alert("خطأ", "حدث خطأ أثناء حفظ البيانات. حاول مرة أخرى.");
+      console.error(error);
+    }
   };
 
   return (
@@ -122,17 +143,11 @@ export default function UserFormScreen({ navigation }) {
             {bloodTypes.map((type) => (
               <TouchableOpacity
                 key={type}
-                style={[
-                  styles.bloodTypeButton,
-                  selectedBloodType === type && styles.selectedBloodType,
-                ]}
+                style={[styles.bloodTypeButton, selectedBloodType === type && styles.selectedBloodType]}
                 onPress={() => setSelectedBloodType(type)}
                 activeOpacity={0.7}
               >
-                <Text style={[
-                  styles.bloodTypeText,
-                  selectedBloodType === type && styles.selectedBloodTypeText
-                ]}>
+                <Text style={[styles.bloodTypeText, selectedBloodType === type && styles.selectedBloodTypeText]}>
                   {type}
                 </Text>
               </TouchableOpacity>
@@ -143,10 +158,7 @@ export default function UserFormScreen({ navigation }) {
         {/* Submit Button */}
         <TouchableOpacity 
           onPress={handleSubmit} 
-          style={[
-            styles.submitButton,
-            isSubmitting && styles.submitButtonDisabled
-          ]}
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
           disabled={isSubmitting}
           activeOpacity={0.8}
         >

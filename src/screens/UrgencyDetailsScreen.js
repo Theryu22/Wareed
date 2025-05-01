@@ -39,7 +39,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isClinicOpen, setIsClinicOpen] = useState(false);
   const [isBookingEnabled, setIsBookingEnabled] = useState(true); // للتحكم في تفعيل الحجز ينفعنا وقت نبي نسوي تست نقفله على كل اليوزرات اذا سوينا ادمن
-  const [overrideClinicHours, setOverrideClinicHours] = useState(false); // يسمح بتجاوز الوقت
+  const [overrideClinicHours, setOverrideClinicHours] = useState(true); // يسمح بتجاوز الوقت
 
 
   const generateTicketCode = () => {
