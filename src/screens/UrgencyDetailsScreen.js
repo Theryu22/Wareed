@@ -2,8 +2,8 @@ import React, { useState, useContext, useEffect } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView } from "react-native";
 import { UserContext } from "../context/UserContext";
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { ref, push, set } from "firebase/database";
-import { database } from "../firebaseConfig";
+import { ref, push, set } from 'firebase/database';
+import { database } from '../firebase/firebaseConfig';
 
 const donationRequests = [
   {
@@ -39,7 +39,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isClinicOpen, setIsClinicOpen] = useState(false);
   const [isBookingEnabled, setIsBookingEnabled] = useState(true); // للتحكم في تفعيل الحجز ينفعنا وقت نبي نسوي تست نقفله على كل اليوزرات اذا سوينا ادمن
-  const [overrideClinicHours, setOverrideClinicHours] = useState(true); // يسمح بتجاوز الوقت
+  const [overrideClinicHours, setOverrideClinicHours] = useState(false); // يسمح بتجاوز الوقت
 
 
   const generateTicketCode = () => {

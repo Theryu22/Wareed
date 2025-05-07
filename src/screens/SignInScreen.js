@@ -16,14 +16,14 @@ import {
   Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { auth, database } from '../firebaseConfig'; // التأكد من استيراد database بشكل صحيح
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"; // Firebase Auth methods
-import { ref, get } from 'firebase/database'; // لاستيراد الطرق للتعامل مع Realtime Database
-import { UserContext } from '../context/UserContext'; // استيراد UserContext
+import { auth, database } from '../firebase/firebaseConfig';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { ref, get } from 'firebase/database';
+import { UserContext } from '../context/UserContext';
 
 export default function SignInScreen() {
   const navigation = useNavigation();
-  const { setUserName, setBloodType, setAge } = useContext(UserContext);
+  const { setUserName, setBloodType, setAge, setIsAdmin, setUserId } = useContext(UserContext);
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -31,52 +31,46 @@ export default function SignInScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Animation values
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const slideUpAnim = useState(new Animated.Value(30))[0];
-  const logoScaleAnim = useState(new Animated.Value(0.5))[0];
-  const logoSkewAnim = useState(new Animated.Value('0deg'))[0]; // Changed to use degrees
-  const formOpacity = useState(new Animated.Value(0))[0];
-  const buttonScale = useState(new Animated.Value(0.9))[0];
+  const fadeAnim = useState(() => new Animated.Value(0))[0];
+  const slideUpAnim = useState(() => new Animated.Value(30))[0];
+  const logoScaleAnim = useState(() => new Animated.Value(0.8))[0];
+  const logoRotateAnim = useState(() => new Animated.Value(0))[0];
+  const formOpacity = useState(() => new Animated.Value(0))[0];
+  const buttonScale = useState(() => new Animated.Value(0.95))[0];
 
   useEffect(() => {
-    // Entrance animations
-    Animated.parallel([ 
+    // Animation sequence
+    Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.timing(slideUpAnim, {
         toValue: 0,
-        duration: 1000,
-        easing: Easing.out(Easing.back(1.5)),
+        duration: 900,
+        easing: Easing.out(Easing.back(1)),
         useNativeDriver: true,
       }),
       Animated.spring(logoScaleAnim, {
         toValue: 1,
-        friction: 5,
-        tension: 60,
+        friction: 4,
+        tension: 40,
         useNativeDriver: true,
       }),
       Animated.sequence([
-        Animated.timing(logoSkewAnim, {
-          toValue: '30deg', // Changed to use degrees
+        Animated.timing(logoRotateAnim, {
+          toValue: 0.2,
           duration: 300,
-          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
-        Animated.timing(logoSkewAnim, {
-          toValue: '-10deg', // Changed to use degrees
+        Animated.timing(logoRotateAnim, {
+          toValue: -0.1,
           duration: 200,
           useNativeDriver: true,
         }),
-        Animated.timing(logoSkewAnim, {
-          toValue: '15deg', // Changed to use degrees
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.spring(logoSkewAnim, {
-          toValue: '0deg', // Changed to use degrees
+        Animated.spring(logoRotateAnim, {
+          toValue: 0,
           friction: 5,
           tension: 100,
           useNativeDriver: true,
@@ -84,13 +78,13 @@ export default function SignInScreen() {
       ]),
       Animated.timing(formOpacity, {
         toValue: 1,
-        duration: 800,
-        delay: 400,
+        duration: 600,
+        delay: 300,
         useNativeDriver: true,
       }),
       Animated.spring(buttonScale, {
         toValue: 1,
-        delay: 600,
+        delay: 500,
         friction: 3,
         tension: 60,
         useNativeDriver: true,
@@ -98,78 +92,113 @@ export default function SignInScreen() {
     ]).start();
   }, []);
 
-  const loadUserData = async (user) => {
-    const db = database;
-
-    // تحميل بيانات المستخدم الشخصية من `Info/{user.uid}`
-    const userRef = ref(db, 'Info/' + user.uid);
-    const snapshot = await get(userRef);
-
-    if (snapshot.exists()) {
-      const userData = snapshot.val();
-
-      // تخزين البيانات في UserContext
-      setUserName(userData.name);
-      setBloodType(userData.bloodType);
-      setAge(userData.age);
-
-      // التحقق من اكتمال البيانات الشخصية
-      if (userData.name && userData.bloodType && userData.age) {
-        // توجيه المستخدم إلى MainApp إذا كانت البيانات مكتملة
-        navigation.replace('MainApp');
-      } else {
-        // إذا كانت البيانات غير مكتملة، توجيههم إلى UserForm
-        navigation.replace('UserForm');
+  // Function to fetch and combine user data from both tables
+  const fetchCombinedUserData = async (userId) => {
+    try {
+      const db = database;
+      
+      // Get basic user data
+      const userRef = ref(db, 'users/' + userId);
+      const userSnapshot = await get(userRef);
+      
+      if (!userSnapshot.exists()) {
+        return null;
       }
-    } else {
-      console.log("لا توجد بيانات شخصية للمستخدم.");
-      navigation.replace('UserForm');
+      
+      // Get user info data
+      const infoRef = ref(db, 'Info/' + userId);
+      const infoSnapshot = await get(infoRef);
+      
+      // Combine the data
+      const userData = userSnapshot.val();
+      const infoData = infoSnapshot.exists() ? infoSnapshot.val() : {};
+      
+      // Merge the data into a single object
+      const combinedData = {
+        ...userData,
+        ...infoData,
+        uid: userId
+      };
+      
+      return combinedData;
+    } catch (error) {
+      console.error("Error fetching combined user data:", error);
+      throw error;
+    }
+  };
+
+  const fetchUserData = async (user) => {
+    try {
+      setIsLoading(true);
+      
+      // Get combined user data
+      const combinedData = await fetchCombinedUserData(user.uid);
+      
+      if (!combinedData) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'UserForm' }],
+        });
+        return;
+      }
+      
+      // Set user context data
+      setUserId(user.uid);
+      setIsAdmin(combinedData.isAdmin || false);
+      setUserName(combinedData.name || '');
+      setBloodType(combinedData.bloodType || '');
+      setAge(combinedData.age || '');
+      
+      // Navigate based on data completeness and admin status
+      if (combinedData.isAdmin) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Admin' }],
+        });
+      } else if (combinedData.name && combinedData.bloodType && combinedData.age) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp' }],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'UserForm' }],
+        });
+      }
+      
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      Alert.alert("Error", "Failed to load user data");
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'UserForm' }],
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSignIn = () => {
-    if (!form.email.trim()) {
-      shakeAnimation();
-      Alert.alert("Error", "Please enter your email address.");
-      return;
-    }
-
-    if (!form.password.trim()) {
-      shakeAnimation();
-      Alert.alert("Error", "Please enter your password.");
-      return;
-    }
-
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) {
-      shakeAnimation();
-      Alert.alert("Error", "Please enter a valid email address.");
-      return;
-    }
-
     setIsLoading(true);
 
-    // Loading animation
+    // Button press animation
     Animated.sequence([
       Animated.timing(buttonScale, {
-        toValue: 0.95,
-        duration: 200,
+        toValue: 0.9,
+        duration: 100,
         useNativeDriver: true,
       }),
       Animated.timing(buttonScale, {
         toValue: 1,
-        duration: 200,
+        duration: 100,
         useNativeDriver: true,
       })
     ]).start();
 
-    // Firebase Authentication
     signInWithEmailAndPassword(auth, form.email, form.password)
-      .then(async (userCredential) => {
-        const user = userCredential.user;
-        console.log("User signed in: ", user);
-
-        // جلب بيانات المستخدم بعد تسجيل الدخول
-        await loadUserData(user);  // جلب البيانات من قاعدة البيانات
+      .then((userCredential) => {
+        fetchUserData(userCredential.user);
       })
       .catch((error) => {
         setIsLoading(false);
@@ -192,19 +221,6 @@ export default function SignInScreen() {
       });
   };
 
-  const shakeAnimation = () => {
-    const shake = new Animated.Value(0);
-
-    Animated.sequence([ 
-      Animated.timing(shake, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: true })
-    ]).start();
-
-    return shake;
-  };
-
   const handleSignUp = () => {
     navigation.navigate('SignUp');
   };
@@ -220,22 +236,41 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Animated.View 
-            style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
+            style={[styles.container, { 
+              opacity: fadeAnim,
+              transform: [{ translateY: slideUpAnim }] 
+            }]}
           >
             <View style={styles.header}>
               <Animated.Image
                 alt="App Logo"
                 resizeMode="contain"
-                style={[styles.headerImg, { transform: [{ scale: logoScaleAnim }, { skewX: logoSkewAnim }] }]}
-                source={require('../pic/Wareed_logoo.png')}             
+                style={[styles.headerImg, { 
+                  transform: [
+                    { scale: logoScaleAnim },
+                    { 
+                      rotate: logoRotateAnim.interpolate({
+                        inputRange: [-0.2, 0.2],
+                        outputRange: ['-10deg', '10deg']
+                      }) 
+                    }
+                  ] 
+                }]}
+                source={require('../pic/Wareed_logoo.png')}
               />
               <Animated.Text 
-                style={[styles.title, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
+                style={[styles.title, { 
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideUpAnim }] 
+                }]}
               >
                 Sign in to <Text style={styles.titleHighlight}>Wareed</Text>
               </Animated.Text>
               <Animated.Text 
-                style={[styles.subtitle, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}
+                style={[styles.subtitle, { 
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideUpAnim }] 
+                }]}
               >
                 قم بالتسجيل لسهولة الوصول لحسابك الشخصي في وريد
               </Animated.Text>
@@ -297,21 +332,21 @@ export default function SignInScreen() {
                 </Animated.View>
               </View>
             </Animated.View>
+
+            <Animated.View style={[styles.formFooterContainer, { opacity: formOpacity }]}>
+              <TouchableOpacity 
+                onPress={handleSignUp}
+                accessibilityRole="button"
+                accessibilityLabel="Sign up link"
+              >
+                <Text style={styles.formFooter}>
+                  Don't have an account?{' '}
+                  <Text style={styles.formFooterLink}>Sign up</Text>
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
           </Animated.View>
         </ScrollView>
-
-        <Animated.View style={{ opacity: formOpacity }}>
-          <TouchableOpacity 
-            onPress={handleSignUp}
-            accessibilityRole="button"
-            accessibilityLabel="Sign up link"
-          >
-            <Text style={styles.formFooter}>
-              Don't have an account?{' '}
-              <Text style={styles.formFooterLink}>Sign up</Text>
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -384,8 +419,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 16,
   },
-  formFooter: {
+  formFooterContainer: {
     padding: 16,
+    paddingBottom: 40,
+    marginTop: 20,
+  },
+  formFooter: {
     fontSize: 15,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.7)',

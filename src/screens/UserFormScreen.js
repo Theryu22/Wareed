@@ -4,7 +4,7 @@ import { UserContext } from "../context/UserContext";
 import { Picker } from '@react-native-picker/picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { ref, set } from "firebase/database"; // تأكد من أنك تستورد set و ref لحفظ البيانات
-import { database, auth } from '../firebaseConfig'; // تأكد من استيراد قاعدة البيانات بشكل صحيح
+import { database, auth } from '../firebase/firebaseConfig'; // تأكد من استيراد قاعدة البيانات بشكل صحيح
 
 export default function UserFormScreen({ navigation }) {
   const { setUserName, setBloodType, setAge } = useContext(UserContext);

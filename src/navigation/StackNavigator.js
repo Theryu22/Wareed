@@ -12,6 +12,10 @@ import SettingsScreen from "../screens/SettingsScreen";
 import DonationsScreen from "../screens/DonationsScreen";
 import ContactUsScreen from "../screens/ContactUsScreen";
 import UrgencyDetailsScreen from "../screens/UrgencyDetailsScreen";
+import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
+import AdminUsersScreen from './src/screens/AdminUsersScreen';
+import AdminDonationsScreen from './src/screens/AdminDonationsScreen';
+
 
 const Stack = createStackNavigator();
 
@@ -40,6 +44,21 @@ export default function StackNavigator() {
         name="UserForm" 
         component={UserFormScreen} 
         options={{ header: () => null }}
+      />
+      <Stack.Screen 
+        name="AdminDashboardScreen" 
+        component={AdminDashboardScreen} 
+        options={{ header: () => null }} // Additional safety
+      />
+      <Stack.Screen 
+        name="AdminUsersScreen" 
+        component={AdminUsersScreen} 
+        options={{ header: () => null }} // Additional safety
+      />
+      <Stack.Screen 
+        name="AdminDonationsScreen" 
+        component={AdminDonationsScreen} 
+        options={{ header: () => null }} // Additional safety
       />
       <Stack.Screen 
         name="GoogleMap" 

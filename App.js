@@ -1,28 +1,46 @@
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
-import { createDrawerNavigator } from "@react-navigation/drawer";
-import GoogleMapScreen from "./src/screens/GoogleMapScreen";
-import SignInScreen from "./src/screens/SignInScreen";
-import SignUpScreen from "./src/screens/SignUpScreen";
-import UserFormScreen from "./src/screens/UserFormScreen";
-import DonateScreen from "./src/screens/DonateScreen"; // Example screen
-import UrgencyDetailsScreen from "./src/screens/UrgencyDetailsScreen"; // Example screen
-import DonationsScreen from "./src/screens/DonationsScreen"; // Example screen
-import ProfileScreen from "./src/screens/ProfileScreen"; // Example screen
-import SettingsScreen from "./src/screens/SettingsScreen"; // Example screen
-import ContactUsScreen from "./src/screens/ContactUsScreen"; // Example screen
-import CustomDrawerContent from "./src/components/CustomDrawerContent";
-import { UserProvider } from "./src/context/UserContext"; // Import User Context
+import React, { useState, useEffect, useContext } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+
+// Screens
+import SignInScreen from './src/screens/SignInScreen';
+import SignUpScreen from './src/screens/SignUpScreen';
+import UserFormScreen from './src/screens/UserFormScreen';
+import GoogleMapScreen from './src/screens/GoogleMapScreen';
+import DonateScreen from './src/screens/DonateScreen';
+import UrgencyDetailsScreen from './src/screens/UrgencyDetailsScreen';
+import DonationsScreen from './src/screens/DonationsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import ContactUsScreen from './src/screens/ContactUsScreen';
+import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
+import AdminUsersScreen from './src/screens/AdminUsersScreen';
+import AdminDonationsScreen from './src/screens/AdminDonationsScreen';
+
+
+// Components
+import CustomDrawerContent from './src/components/CustomDrawerContent';
+import AdminDrawerContent from './src/components/AdminDrawerContent';
+
+// Context
+import { UserProvider } from './src/context/UserContext';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
+const LoadingScreen = () => (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color="#075eec" />
+  </View>
+);
+
 function MainApp() {
   return (
     <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{ drawerPosition: "right", drawerType: "back" }}
+    drawerContent={(props) => <CustomDrawerContent {...props} />}
+    screenOptions={{ drawerPosition: "right", drawerType: "back" }}
     >
       <Drawer.Screen name="GoogleMapScreen" component={GoogleMapScreen} />
       <Drawer.Screen name="DonateScreen" component={DonateScreen} />
@@ -35,7 +53,20 @@ function MainApp() {
   );
 }
 
-export default function App() {
+function AdminNavigator() {
+  return (
+    <Drawer.Navigator
+    drawerContent={(props) => <AdminDrawerContent {...props} />}
+    screenOptions={{ drawerPosition: "right", drawerType: "back" }}
+    >
+      <Drawer.Screen name="AdminDashboardScreen" component={AdminDashboardScreen} />
+      <Drawer.Screen name="AdminUsersScreen" component={AdminUsersScreen} />
+      <Drawer.Screen name="AdminDonationsScreen" component={AdminDonationsScreen} />
+    </Drawer.Navigator>
+  );
+} 
+
+function App() {
   return (
     <UserProvider>
       <NavigationContainer>
@@ -44,8 +75,19 @@ export default function App() {
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="UserForm" component={UserFormScreen} />
           <Stack.Screen name="MainApp" component={MainApp} />
+          <Stack.Screen name="Admin" component={AdminNavigator} />
         </Stack.Navigator>
       </NavigationContainer>
     </UserProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
+export default App;

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { ref, onValue } from 'firebase/database';
-import { database } from '../firebaseConfig';
+import { database } from '../firebase/firebaseConfig';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import moment from 'moment';
 import 'moment-timezone';
-import { auth } from '../firebaseConfig';  // التأكد من استيراد auth
+import { auth } from '../firebase/firebaseConfig';  // التأكد من استيراد auth
 
 export default function DonationsScreen({ navigation }) {
   const [donations, setDonations] = useState([]);
@@ -14,7 +14,7 @@ export default function DonationsScreen({ navigation }) {
 
   const fetchDonations = () => {
     setRefreshing(true);
-    const userId = auth.currentUser.uid; // الحصول على ال UID الخاص بالمستخدم
+   const userId = auth.currentUser.uid; // الحصول على ال UID الخاص بالمستخدم
     const donationsRef = ref(database, 'donations');
 
     const unsubscribe = onValue(donationsRef, (snapshot) => {

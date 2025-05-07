@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from "react";
-import { auth } from "../firebaseConfig"; // تأكد من استيراد auth بشكل صحيح
+import { auth } from "../firebase/firebaseConfig"; // تأكد من استيراد auth بشكل صحيح
 import { getDatabase, ref, get } from "firebase/database"; // استيراد قاعدة البيانات
 
 export const UserContext = createContext();
@@ -50,6 +50,7 @@ export const UserProvider = ({ children }) => {
         setIsAdmin,
         language,
         setLanguage,
+        setUserId,
         userId // Store the userId as well
       }}
     >
