@@ -1,73 +1,71 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
-import { ref, onValue } from 'firebase/database';
-import { database } from '../firebase/firebaseConfig';
+import React, { useState, useEffect, useContext } from 'react';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert,
+  ActivityIndicator,
+  RefreshControl
+} from 'react-native';
+import { UserContext } from '../context/UserContext';
+import { ref, query, orderByChild, equalTo, onValue } from 'firebase/database';
+import { database, auth } from '../firebase/firebaseConfig';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import moment from 'moment';
-import 'moment-timezone';
-import { auth } from '../firebase/firebaseConfig';  // التأكد من استيراد auth
+import 'moment/locale/ar';
+
+moment.locale('ar');
 
 export default function DonationsScreen({ navigation }) {
+  const { userId } = useContext(UserContext);
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDonations = () => {
     setRefreshing(true);
-   const userId = auth.currentUser.uid; // الحصول على ال UID الخاص بالمستخدم
-    const donationsRef = ref(database, 'donations');
+    if (!userId) {
+      setRefreshing(false);
+      return;
+    }
 
-    const unsubscribe = onValue(donationsRef, (snapshot) => {
+    const donationsQuery = query(
+      ref(database, 'donations'),
+      orderByChild('userId'),
+      equalTo(userId)
+    );
+
+    const unsubscribe = onValue(donationsQuery, (snapshot) => {
       const donationsData = [];
+      
       if (snapshot.exists()) {
         snapshot.forEach((childSnapshot) => {
           const donation = childSnapshot.val();
-
-          // تحقق من أن التبرع يخص هذا المستخدم
-          if (donation.userId === userId) { // تحقق من وجود userId في التبرع
-            let dateValue;
-            if (donation.date) {
-              if (typeof donation.date === 'object' && donation.date.seconds) {
-                // Firebase timestamp object
-                dateValue = new Date(donation.date.seconds * 1000).toISOString();
-              } else if (typeof donation.date === 'string') {
-                // Try parsing as ISO string or other format
-                const parsedDate = new Date(donation.date);
-                dateValue = isNaN(parsedDate.getTime()) ? new Date().toISOString() : donation.date;
-              } else {
-                // Fallback to current date
-                dateValue = new Date().toISOString();
-              }
-            } else {
-              // No date provided, use Firebase push ID timestamp
-              const pushIdTimestamp = parseInt(childSnapshot.key.substring(0,8), 16) * 1000;
-              dateValue = new Date(pushIdTimestamp).toISOString();
-            }
-
-            donationsData.push({
-              id: childSnapshot.key,
-              donorName: donation.donorName || 'مجهول',
-              ticketCode: donation.ticketCode || 'غير متوفر',
-              bloodType: donation.bloodType || 'غير محدد',
-              location: donation.location || 'غير محدد',
-              date: dateValue,
-              appointmentTime: donation.time || 'غير محدد',
-              status: donation.status || 'معلقة',
-              urgency: donation.urgency || 'عادي'
-            });
-          }
+          
+          donationsData.push({
+            id: childSnapshot.key,
+            donorName: donation.donorName || "غير معروف",
+            bloodType: donation.bloodType || "غير محدد",
+            location: donation.location || "غير محدد",
+            date: donation.date || new Date().toISOString(),
+            time: donation.time || "غير محدد",
+            status: donation.status || "معلقة",
+            urgency: donation.urgency || "عادي",
+            ticketCode: donation.ticketCode || "غير متوفر"
+          });
         });
-        
+
+        // Sort by date (newest first)
         donationsData.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setDonations(donationsData);
-      } else {
-        setDonations([]);
       }
+
+      setDonations(donationsData);
       setLoading(false);
       setRefreshing(false);
     }, (error) => {
       console.error("Error fetching donations:", error);
-      Alert.alert("خطأ", "تعذر تحميل سجل التبرعات");
       setLoading(false);
       setRefreshing(false);
     });
@@ -75,44 +73,16 @@ export default function DonationsScreen({ navigation }) {
     return unsubscribe;
   };
 
-  const formatDisplayDate = (dateString) => {
-    try {
-      let date;
-      
-      // Handle Firebase timestamp objects
-      if (typeof dateString === 'object' && dateString.seconds) {
-        date = new Date(dateString.seconds * 1000);
-      } 
-      // Handle string dates
-      else if (typeof dateString === 'string') {
-        date = new Date(dateString);
-        
-        // If invalid, try extracting from Firebase push ID
-        if (isNaN(date.getTime()) && dateString.length === 20) {
-          const timeStr = dateString.substring(0,8);
-          date = new Date(parseInt(timeStr, 16) * 1000);
-        }
-      }
-      
-      // Final validation
-      if (!date || isNaN(date.getTime())) {
-        throw new Error('Invalid date format');
-      }
-      
-      return moment(date).tz('Asia/Riyadh').format('DD/MM/YYYY');
-    } catch (error) {
-      console.error("Date formatting error:", error, "Original value:", dateString);
-      return "تاريخ غير متوفر";
-    }
-  };
+  useEffect(() => {
+    const unsubscribe = fetchDonations();
+    return () => unsubscribe();
+  }, [userId]);
 
   const getStatusColor = (status) => {
     switch(status) {
-      case 'مكتمل': return '#4CAF50';
-      case 'ملغى': return '#F44336';
-      case 'مرفوض': return '#FF5722';
-      case 'معلقة': return '#FFC107';
-      case 'مقبول': return '#2196F3';
+      case 'approved': return '#4CAF50';
+      case 'Rejected': return '#FF5722';
+      case 'pending': return '#FFC107';
       default: return '#607D8B';
     }
   };
@@ -126,23 +96,67 @@ export default function DonationsScreen({ navigation }) {
     }
   };
 
-  const renderEmptyComponent = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="water" size={60} color="#ddd" />
-      <Text style={styles.emptyText}>لا توجد تبرعات مسجلة</Text>
-      <TouchableOpacity 
-        style={styles.donateButton}
-        onPress={() => navigation.navigate('DonateScreen')}
-      >
-        <Text style={styles.donateButtonText}>تبرع الآن</Text>
-      </TouchableOpacity>
+const formatDate = (dateString) => {
+  // Ensure the dateString is valid before formatting
+  if (!dateString) {
+    return "غير محدد";  // Return default if date is invalid
+  }
+  
+  // Parse the date string with moment
+  const parsedDate = moment(dateString);
+
+  // Check if the parsed date is valid, otherwise return a default value
+  if (!parsedDate.isValid()) {
+    // Return a default formatted date instead of ISO string
+    return moment().format('DD MMMM YYYY، h:mm a'); // Returns today's date in the preferred format
+  }
+
+  // Format the valid date
+  return parsedDate.format('DD MMMM YYYY، h:mm a');
+};
+
+
+  const renderDonationItem = ({ item }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.urgencyBadge, {backgroundColor: getUrgencyColor(item.urgency)}]}>
+          <Text style={styles.urgencyText}>{item.urgency}</Text>
+        </View>
+        <Text style={styles.dateText}>{formatDate(item.date)}</Text>
+      </View>
+      
+      <View style={styles.cardBody}>
+        <View style={styles.infoRow}>
+          <Ionicons name="person" size={18} color="#075eec" />
+          <Text style={styles.infoText}>المتبرع: {item.donorName}</Text>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <Ionicons name="water" size={18} color="#075eec" />
+          <Text style={styles.infoText}>فصيلة الدم: {item.bloodType}</Text>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <Ionicons name="location" size={18} color="#075eec" />
+          <Text style={styles.infoText}>المكان: {item.location}</Text>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <Ionicons name="time" size={18} color="#075eec" />
+          <Text style={styles.infoText}>الوقت: {item.time}</Text>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <Ionicons name="barcode" size={18} color="#075eec" />
+          <Text style={styles.infoText}>رقم التذكرة: {item.ticketCode}</Text>
+        </View>
+        
+        <View style={[styles.statusBadge, {backgroundColor: getStatusColor(item.status)}]}>
+          <Text style={styles.statusText}>الحالة: {item.status}</Text>
+        </View>
+      </View>
     </View>
   );
-
-  useEffect(() => {
-    const unsubscribe = fetchDonations();
-    return () => unsubscribe();
-  }, []);
 
   if (loading) {
     return (
@@ -154,38 +168,23 @@ export default function DonationsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>سجل التبرعات</Text>
-        <TouchableOpacity onPress={fetchDonations}>
-          <Ionicons name="refresh" size={24} color="#075eec" />
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={donations}
+        renderItem={renderDonationItem}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.urgencyBadge, {backgroundColor: getUrgencyColor(item.urgency)}]}>
-                <Text style={styles.urgencyText}>{item.urgency}</Text>
-              </View>
-              <Text style={styles.dateText}>{formatDisplayDate(item.date)}</Text>
-            </View>
-            
-            <View style={styles.cardBody}>
-              <View style={styles.infoRow}>
-                <Ionicons name="person" size={18} color="#075eec" />
-                <Text style={styles.infoText}>المتبرع: {item.donorName}</Text>
-              </View>
-               {/* باقي العناصر */}
-            </View>
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={fetchDonations}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="water" size={60} color="#ddd" />
+            <Text style={styles.emptyText}>لا توجد تبرعات مسجلة</Text>
           </View>
-        )}
-        ListEmptyComponent={renderEmptyComponent}
-        refreshing={refreshing}
-        onRefresh={fetchDonations}
-        contentContainerStyle={styles.listContent}
+        }
+        contentContainerStyle={donations.length === 0 && styles.emptyListContainer}
       />
     </View>
   );
@@ -195,29 +194,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    padding: 15,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  listContent: {
-    padding: 15,
-    paddingBottom: 30,
   },
   card: {
     backgroundColor: '#fff',
@@ -267,6 +249,16 @@ const styles = StyleSheet.create({
     color: '#333',
     marginRight: 8,
   },
+  statusBadge: {
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -279,16 +271,8 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     textAlign: 'center',
   },
-  donateButton: {
-    backgroundColor: '#075eec',
-    padding: 15,
-    borderRadius: 8,
-    width: '80%',
-    alignItems: 'center',
-  },
-  donateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
 });

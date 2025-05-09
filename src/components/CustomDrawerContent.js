@@ -19,7 +19,7 @@ export default function CustomDrawerContent({ navigation }) {
       {/* Header Section */}
       <View style={styles.header}>
         <Image
-          source={require('../pic/app-logo.avif')}
+          source={require('../pic/Wareed_logoo.png')}
           style={styles.logo}
         />
       </View>
@@ -85,17 +85,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingTop: 40,
+    paddingTop: 20,
   },
   header: {
+    paddingTop: 20,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: -30,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   logo: {
     width: 180,
-    height: 60,
+    height: 110,
     resizeMode: 'contain',
     alignSelf: 'flex-end',
   },

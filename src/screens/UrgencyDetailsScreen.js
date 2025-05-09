@@ -1,9 +1,10 @@
-import React, { useState, useContext, useEffect } from "react";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView } from "react-native";
+import React, { useState, useContext } from "react";
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, ScrollView } from "react-native";
 import { UserContext } from "../context/UserContext";
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { ref, push, set } from 'firebase/database';
-import { database } from '../firebase/firebaseConfig';
+import { getDatabase, ref, push, set } from 'firebase/database';
+import { auth } from '../firebase/firebaseConfig';
+import QRCode from 'react-native-qrcode-svg';
 
 const donationRequests = [
   {
@@ -32,15 +33,15 @@ const donationRequests = [
 export default function UrgencyDetailsScreen({ route, navigation }) {
   const { userName, bloodType } = useContext(UserContext);
   const { urgency } = route.params;
-
   
   const [isTimeModalVisible, setIsTimeModalVisible] = useState(false);
+  const [isTicketModalVisible, setIsTicketModalVisible] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isClinicOpen, setIsClinicOpen] = useState(false);
-  const [isBookingEnabled, setIsBookingEnabled] = useState(true); // للتحكم في تفعيل الحجز ينفعنا وقت نبي نسوي تست نقفله على كل اليوزرات اذا سوينا ادمن
-  const [overrideClinicHours, setOverrideClinicHours] = useState(false); // يسمح بتجاوز الوقت
-
+  const [isBookingEnabled, setIsBookingEnabled] = useState(true);
+  const [overrideClinicHours, setOverrideClinicHours] = useState(true);
+  const [ticketDetails, setTicketDetails] = useState(null);
 
   const generateTicketCode = () => {
     return Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -50,44 +51,51 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     const ticketCode = generateTicketCode();
     const request = selectedRequest;
     
-    Alert.alert(
-      "تم حجز الموعد بنجاح",
-      `اسم المتبرع: ${userName}\nرقم التذكرة: ${ticketCode}\nالوقت: ${time}\nالمكان: ${request.location}`,
-      [
-        { 
-          text: "تم", 
-          onPress: () => {
-            saveDonationToFirebase(userName, ticketCode, bloodType, time, request);
-            navigation.goBack();
-          }
-        }
-      ]
-    );
-  };
-
-  const saveDonationToFirebase = (donorName, ticketCode, bloodType, time, request) => {
-    const donationData = {
-      donorName: donorName,
-      urgency: request.urgency,
+    setTicketDetails({
+      donorName: userName,
       ticketCode: ticketCode,
-      bloodType: bloodType,
-      location: request.location,
-      date: new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }),
       time: time,
-      status: 'معلقة',
-      timezone: 'Asia/Riyadh'
-    };
-
-    const donationRef = ref(database, 'donations');
-    const newDonationRef = push(donationRef);
-
-    set(newDonationRef, donationData)
-      .then(() => console.log("تم حفظ التبرع بنجاح"))
-      .catch((error) => console.error("خطأ في حفظ التبرع: ", error));
+      location: request.location,
+      bloodType: bloodType,
+      urgency: request.urgency
+    });
+    
+    setIsTimeModalVisible(false);
+    setIsTicketModalVisible(true);
+    
+    saveDonationToFirebase(userName, ticketCode, bloodType, time, request);
   };
 
-  const getSaudiTime = () => {
-    return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+  const saveDonationToFirebase = async (donorName, ticketCode, bloodType, time, request) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      const db = getDatabase();
+      const donationsRef = ref(db, 'donations');
+      const newDonationRef = push(donationsRef);
+
+      const donationData = {
+        donorName: donorName,
+        urgency: request.urgency,
+        ticketCode: ticketCode,
+        bloodType: bloodType,
+        location: request.location,
+        date: new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }),
+        time: time,
+        status: 'pending',
+        timezone: 'Asia/Riyadh',
+        userId: user.uid,
+        createdAt: Date.now()
+      };
+
+      await set(newDonationRef, donationData);
+      console.log("تم حفظ التبرع بنجاح");
+      return newDonationRef.key;
+    } catch (error) {
+      console.error("خطأ في حفظ التبرع: ", error);
+      throw error;
+    }
   };
 
   const checkClinicHours = () => {
@@ -113,11 +121,11 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     const saudiOffset = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
     const saudiTime = new Date(now.getTime() + saudiOffset);
     
-    let currentHour = saudiTime.getUTCHours(); // Changed to let
-    let currentMinutes = saudiTime.getUTCMinutes(); // Changed to let
+    let currentHour = saudiTime.getUTCHours();
+    let currentMinutes = saudiTime.getUTCMinutes();
     
     const slots = [];
-    let startHour = Math.max(currentHour, 8); // Changed to let
+    let startHour = Math.max(currentHour, 8);
     const endHour = 16; // Clinic closes at 4 PM
     const interval = 20; // 20 minutes between slots
     
@@ -125,7 +133,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     let firstSlotMinute = Math.ceil(currentMinutes / interval) * interval;
     if (firstSlotMinute >= 60) {
       firstSlotMinute = 0;
-      startHour += 1; // This was causing the error
+      startHour += 1;
     }
   
     // Generate time slots in Saudi time
@@ -236,10 +244,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
                   <TouchableOpacity
                     key={`time-${index}`}
                     style={styles.timeSlotButton}
-                    onPress={() => {
-                      setIsTimeModalVisible(false);
-                      showTicketNotification(time);
-                    }}
+                    onPress={() => showTicketNotification(time)}
                   >
                     <Text style={styles.timeSlotText}>{time}</Text>
                   </TouchableOpacity>
@@ -254,6 +259,82 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
               onPress={() => setIsTimeModalVisible(false)}
             >
               <Text style={styles.modalButtonText}>إلغاء</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Ticket Modal */}
+      <Modal
+        visible={isTicketModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setIsTicketModalVisible(false);
+          navigation.goBack();
+        }}
+      >
+        <View style={styles.ticketModalOverlay}>
+          <View style={styles.ticketContainer}>
+            <View style={styles.ticketHeader}>
+              <Text style={styles.ticketTitle}>تذكرة التبرع بالدم</Text>
+              <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
+            </View>
+            
+            <View style={styles.ticketQRContainer}>
+              <QRCode
+                value={ticketDetails?.ticketCode}
+                size={150}
+                color="#000"
+                backgroundColor="#fff"
+              />
+            </View>
+            
+            <View style={styles.ticketDetails}>
+              <View style={styles.ticketRow}>
+                <Ionicons name="person" size={20} color="#555" />
+                <Text style={styles.ticketText}>المتبرع: {ticketDetails?.donorName}</Text>
+              </View>
+              
+              <View style={styles.ticketRow}>
+                <Ionicons name="ticket" size={20} color="#555" />
+                <Text style={styles.ticketText}>رقم التذكرة: {ticketDetails?.ticketCode}</Text>
+              </View>
+              
+              <View style={styles.ticketRow}>
+                <Ionicons name="time" size={20} color="#555" />
+                <Text style={styles.ticketText}>الوقت: {ticketDetails?.time}</Text>
+              </View>
+              
+              <View style={styles.ticketRow}>
+                <Ionicons name="location" size={20} color="#555" />
+                <Text style={styles.ticketText}>المكان: {ticketDetails?.location}</Text>
+              </View>
+              
+              <View style={styles.ticketRow}>
+                <Ionicons name="water" size={20} color="#555" />
+                <Text style={styles.ticketText}>فصيلة الدم: {ticketDetails?.bloodType}</Text>
+              </View>
+              
+              <View style={styles.ticketRow}>
+                <Ionicons name="alert-circle" size={20} color="#555" />
+                <Text style={styles.ticketText}>الأولوية: {ticketDetails?.urgency}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.ticketFooter}>
+              <Text style={styles.ticketNote}>يرجى إحضار الهوية الوطنية عند الحضور</Text>
+              <Text style={styles.ticketNote}>هذه التذكرة صالحة ليوم واحد فقط</Text>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.ticketCloseButton}
+              onPress={() => {
+                setIsTicketModalVisible(false);
+                navigation.goBack();
+              }}
+            >
+              <Text style={styles.ticketCloseButtonText}>تم</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -414,5 +495,79 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: '#f44336',
+  },
+  ticketModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  ticketContainer: {
+    width: '90%',
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+  },
+  ticketHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 15,
+  },
+  ticketTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#d32f2f',
+  },
+  ticketQRContainer: {
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginVertical: 15,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  ticketDetails: {
+    width: '100%',
+    marginVertical: 10,
+  },
+  ticketRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 5,
+    paddingHorizontal: 10,
+  },
+  ticketText: {
+    fontSize: 16,
+    marginLeft: 10,
+    color: '#333',
+  },
+  ticketFooter: {
+    marginTop: 15,
+    width: '100%',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 10,
+  },
+  ticketNote: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 3,
+    fontStyle: 'italic',
+  },
+  ticketCloseButton: {
+    marginTop: 20,
+    backgroundColor: '#d32f2f',
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+  },
+  ticketCloseButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

@@ -9,8 +9,9 @@ export default function AdminDrawerContent({ navigation }) {
 
   const adminMenuItems = [
     { name: "Dashboard", icon: "speedometer-outline", screen: "AdminDashboardScreen" },
-    { name: "Manage Users", icon: "people-outline", screen: "AdminUsersScreen" },
-    { name: "Donation Requests", icon: "water-outline", screen: "AdminDonationsScreen" },
+  //  { name: "Main App", icon: "home-outline", screen: "MainApp" },
+    // { name: "Manage Users", icon: "people-outline", screen: "AdminUsersScreen" },
+   // { name: "Donation Requests", icon: "water-outline", screen: "AdminDonationsScreen" },
   ];
 
   const handleLogout = () => {

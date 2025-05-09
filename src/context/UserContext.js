@@ -1,60 +1,113 @@
-import React, { createContext, useState, useEffect } from "react";
-import { auth } from "../firebase/firebaseConfig"; // تأكد من استيراد auth بشكل صحيح
-import { getDatabase, ref, get } from "firebase/database"; // استيراد قاعدة البيانات
+// src/context/UserContext.js
+import React, { createContext, useState, useEffect } from 'react';
+import { auth } from '../firebase/firebaseConfig';
+import { getDatabase, ref, get } from 'firebase/database';
 
-export const UserContext = createContext();
+// 1. First create the context with proper default values
+const UserContext = createContext({
+  // User data
+  userId: null,
+  userName: '',
+  bloodType: '',
+  age: '',
+  email: '',
+  isAdmin: false,
+  
+  // Status
+  isLoading: true,
+  
+  // Methods
+  setUserId: () => {},
+  setUserName: () => {},
+  setBloodType: () => {},
+  setAge: () => {},
+  setIsAdmin: () => {},
+  setEmail: () => {},
+});
 
+// 2. Then create the provider component
 export const UserProvider = ({ children }) => {
-  // User information states
-  const [userName, setUserName] = useState("");
-  const [bloodType, setBloodType] = useState("");
-  const [age, setAge] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userId, setUserId] = useState(null);
+  const [state, setState] = useState({
+    userId: null,
+    userName: '',
+    bloodType: '',
+    age: '',
+    email: '',
+    isAdmin: false,
+    isLoading: true
+  });
 
-  // Language state (default to Arabic)
-  const [language, setLanguage] = useState('ar');
+  // Individual setter functions
+  const setUserId = (userId) => setState(prev => ({...prev, userId}));
+  const setUserName = (userName) => setState(prev => ({...prev, userName}));
+  const setBloodType = (bloodType) => setState(prev => ({...prev, bloodType}));
+  const setAge = (age) => setState(prev => ({...prev, age}));
+  const setIsAdmin = (isAdmin) => setState(prev => ({...prev, isAdmin}));
+  const setEmail = (email) => setState(prev => ({...prev, email}));
 
-  // Load user data when user is logged in
+  const fetchUserData = async (userId) => {
+    try {
+      const db = getDatabase();
+      const [userSnapshot, infoSnapshot] = await Promise.all([
+        get(ref(db, `users/${userId}`)),
+        get(ref(db, `Info/${userId}`))
+      ]);
+
+      return {
+        userId,
+        userName: infoSnapshot?.val()?.name || '',
+        bloodType: infoSnapshot?.val()?.bloodType || '',
+        age: infoSnapshot?.val()?.age || '',
+        email: userSnapshot?.val()?.email || '',
+        isAdmin: userSnapshot?.val()?.isAdmin || false,
+        isLoading: false
+      };
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      return {
+        ...state,
+        isLoading: false
+      };
+    }
+  };
+
   useEffect(() => {
-    const loadUserData = async () => {
-      const user = auth.currentUser; // Get current user after login
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        const userRef = ref(getDatabase(), `users/${user.uid}`); // Get the user data from Firebase
-        const snapshot = await get(userRef);
-        
-        if (snapshot.exists()) {
-          const userData = snapshot.val();
-          setUserName(userData.name || "غير معرف");
-          setBloodType(userData.bloodType || "غير محدد");
-          setAge(userData.age || "غير محدد");
-          setIsAdmin(userData.isAdmin || false); // Assuming 'isAdmin' is stored in Firebase
-          setUserId(user.uid);
-        }
+        const userData = await fetchUserData(user.uid);
+        setState(userData);
+      } else {
+        setState({
+          userId: null,
+          userName: '',
+          bloodType: '',
+          age: '',
+          email: '',
+          isAdmin: false,
+          isLoading: false
+        });
       }
-    };
-    
-    loadUserData();
-  }, [auth.currentUser]);
+    });
+
+    return unsubscribe;
+  }, []);
 
   return (
-    <UserContext.Provider 
-      value={{ 
-        userName, 
-        setUserName, 
-        bloodType, 
-        setBloodType, 
-        age, 
-        setAge,
-        isAdmin,
-        setIsAdmin,
-        language,
-        setLanguage,
+    <UserContext.Provider
+      value={{
+        ...state,
         setUserId,
-        userId // Store the userId as well
+        setUserName,
+        setBloodType,
+        setAge,
+        setIsAdmin,
+        setEmail
       }}
     >
       {children}
     </UserContext.Provider>
   );
 };
+
+// Export both the context and provider
+export { UserContext };

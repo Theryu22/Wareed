@@ -25,7 +25,7 @@ import CustomDrawerContent from './src/components/CustomDrawerContent';
 import AdminDrawerContent from './src/components/AdminDrawerContent';
 
 // Context
-import { UserProvider } from './src/context/UserContext';
+import { UserProvider  } from './src/context/UserContext';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();

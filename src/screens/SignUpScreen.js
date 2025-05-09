@@ -124,35 +124,53 @@ export default function SignUpScreen() {
       const user = userCredential.user;
       const db = getDatabase();
 
-      // 2. Create the user record in Realtime Database
-      await set(ref(db, `users/${user.uid}`), {
-        email: form.email,
-        isAdmin: form.email === 'admin@wareed.com', // Auto-set admin for specific email
-        uid: user.uid,
-        createdAt: new Date().toISOString()
-      });
-
-    /*  // 3. Create the user info in the Info node
-      await set(ref(db, `Info/${user.uid}`), {
-        email: form.email,
-        createdAt: new Date().toISOString()
-        // Other fields will be added later in UserFormScreen
-      }); */
+      // 2. Create user records in both database locations
+      await Promise.all([
+        // Basic user data in 'users' node
+        set(ref(db, `users/${user.uid}`), {
+          email: form.email,
+          isAdmin: form.email === 'admin@wareed.com', // Special admin email
+          createdAt: new Date().toISOString(),
+          uid: user.uid
+        }),
+        
+        // Additional user info in 'Info' node
+        set(ref(db, `Info/${user.uid}`), {
+          email: form.email,
+          createdAt: new Date().toISOString(),
+          // These fields will be empty initially and filled in UserFormScreen
+          name: '',
+          age: '',
+          bloodType: ''
+        })
+      ]);
 
       setIsLoading(false);
       
-      // Navigate to additional profile setup or main app
-      navigation.replace('SignIn'); 
+      // Navigate to UserFormScreen to complete profile
+      navigation.replace('UserForm', { 
+        uid: user.uid,
+        email: form.email 
+      });
       
     } catch (error) {
       setIsLoading(false);
       console.error("Signup error:", error);
       
       let errorMessage = "Signup failed. Please try again.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email is already registered.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Please enter a valid email address.";
+      switch(error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = "This email is already registered.";
+          break;
+        case 'auth/invalid-email':
+          errorMessage = "Please enter a valid email address.";
+          break;
+        case 'auth/weak-password':
+          errorMessage = "Password should be at least 6 characters.";
+          break;
+        case 'PERMISSION_DENIED':
+          errorMessage = "Database write permission denied.";
+          break;
       }
       
       Alert.alert("Error", errorMessage);
@@ -169,27 +187,47 @@ export default function SignUpScreen() {
           contentContainerStyle={styles.scrollViewContainer} 
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View style={[styles.container, { 
-            opacity: fadeAnim,
-            transform: [{ translateY: slideUpAnim }] 
-          }]}>
-            <View style={styles.header}>
-              <Animated.View style={{ 
-                transform: [
-                  { scale: logoScaleAnim },
-                  { 
-                    rotate: logoRotateAnim.interpolate({
-                      inputRange: [-0.2, 0.2],
-                      outputRange: ['-10deg', '10deg']
-                    }) 
-                  }
-                ] 
-              }}>
-                <View style={styles.logoPlaceholder} />
-              </Animated.View>
-              <Text style={styles.title}>Create Account</Text>
-            </View>
-
+             <Animated.View 
+                      style={[styles.container, { 
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideUpAnim }] 
+                      }]}
+                    >
+                      <View style={styles.header}>
+                        <Animated.Image
+                          alt="App Logo"
+                          resizeMode="contain"
+                          style={[styles.headerImg, { 
+                            transform: [
+                              { scale: logoScaleAnim },
+                              { 
+                                rotate: logoRotateAnim.interpolate({
+                                  inputRange: [-0.2, 0.2],
+                                  outputRange: ['-10deg', '10deg']
+                                }) 
+                              }
+                            ] 
+                          }]}
+                          source={require('../pic/Wareed_logoo.png')}
+                        />
+                        <Animated.Text 
+                          style={[styles.title, { 
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideUpAnim }] 
+                          }]}
+                        >
+                          Sign Up to <Text style={styles.titleHighlight}>Wareed</Text>
+                        </Animated.Text>
+                        <Animated.Text 
+                          style={[styles.subtitle, { 
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideUpAnim }] 
+                          }]}
+                        >
+                          قم بالتسجيل لسهولة الوصول لحسابك الشخصي في وريد
+                        </Animated.Text>
+                      </View>
+                      
             <Animated.View style={[styles.form, { opacity: formOpacity }]}>
               <View style={styles.input}>
                 <Text style={styles.inputLabel}>Email address</Text>
@@ -257,75 +295,131 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1, 
-    backgroundColor: '#1a1a2e' 
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
   },
   keyboardAvoidingView: {
-    flex: 1
+    flex: 1,
   },
-  scrollViewContainer: { 
-    flexGrow: 1, 
-    justifyContent: 'center' 
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
-  container: { 
-    padding: 24, 
-    flexGrow: 1, 
-    justifyContent: 'center' 
+  container: {
+    padding: 24,
+    flexGrow: 1,
+    justifyContent: 'center',
   },
-  header: { 
-    alignItems: 'center', 
-    marginBottom: 36 
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#4cc9f0',
+  titleHighlight: {
+    color: '#4cc9f0',
+    fontWeight: '900',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: 36,
+    lineHeight: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  headerImg: {
+    width: 200,
+    height: 150,
+    marginBottom: 0,
+  },
+  form: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 20,
-    marginBottom: 20
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  title: { 
-    fontSize: 32, 
-    fontWeight: '800', 
-    color: '#FFFFFF', 
-    textAlign: 'center' 
+  formAction: {
+    marginVertical: 24,
   },
-  form: { 
-    backgroundColor: 'rgba(255, 255, 255, 0.08)', 
-    borderRadius: 20, 
-    padding: 24, 
-    shadowColor: '#000', 
-    elevation: 10 
+  formLink: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'right',
+    marginBottom: 16,
   },
-  input: { 
-    marginBottom: 20 
+  formFooterContainer: {
+    padding: 16,
+    paddingBottom: 40,
+    marginTop: 20,
   },
-  inputLabel: { 
-    fontSize: 16, 
-    fontWeight: '600', 
-    color: '#FFFFFF', 
-    marginBottom: 10 
+  formFooter: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
   },
-  inputControl: { 
-    height: 52, 
-    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
-    paddingHorizontal: 16, 
-    borderRadius: 14, 
-    fontSize: 16, 
+  formFooterLink: {
+    textDecorationLine: 'underline',
+    color: '#4cc9f0',
+    fontWeight: '700',
+  },
+  input: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 10,
+    opacity: 0.9,
+  },
+  inputControl: {
+    height: 52,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    fontSize: 16,
+    fontWeight: '500',
     color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)'
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  btn: { 
-    backgroundColor: '#4cc9f0', 
-    paddingVertical: 14, 
-    borderRadius: 30, 
-    alignItems: 'center' 
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 30,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    backgroundColor: '#4cc9f0',
+    shadowColor: '#4cc9f0',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  btnText: { 
-    color: '#fff', 
-    fontSize: 18, 
-    fontWeight: '700' 
+  btnDisabled: {
+    opacity: 0.7,
+  },
+  btnText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
   link: { 
     marginTop: 15, 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { database } from '../firebase/firebaseConfig';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const AdminDashboard = ({ navigation }) => {
@@ -15,17 +15,17 @@ const AdminDashboard = ({ navigation }) => {
 
   const fetchData = async () => {
     // Fetch urgent requests
-    const urgentQuery = query(collection(db, "donations"), where("urgency", "==", "high"));
+    const urgentQuery = query(collection(database, "donations"), where("urgency", "==", "high"));
     const urgentSnapshot = await getDocs(urgentQuery);
     setUrgentRequests(urgentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
     // Fetch recent donations
-    const donationsQuery = query(collection(db, "donations"), orderBy("date", "desc"), limit(10));
+    const donationsQuery = query(collection(database, "donations"), orderBy("date", "desc"), limit(10));
     const donationsSnapshot = await getDocs(donationsQuery);
     setDonations(donationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
     // Fetch users
-    const usersSnapshot = await getDocs(collection(db, "users"));
+    const usersSnapshot = await getDocs(collection(database, "users"));
     setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
@@ -38,26 +38,12 @@ const AdminDashboard = ({ navigation }) => {
       screen: "AdminDonationsScreen"
     },
     { 
-      title: "Today's Donations", 
-      count: donations.filter(d => isToday(d.date)).length,
-      icon: "water",
-      color: "#3498db",
-      screen: "AdminDonationsScreen"
-    },
-    { 
       title: "Registered Users", 
       count: users.length,
       icon: "people",
       color: "#2ecc71",
-      screen: "AdminUserScreen"
+      screen: "AdminUsersScreen"
     },
-    { 
-      title: "Blood Inventory", 
-      count: "Manage",
-      icon: "flask",
-      color: "#9b59b6",
-      screen: "AdminInventory"
-    }
   ];
 
   return (

@@ -1,78 +1,155 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ActivityIndicator,
+  TextInput,
+  Alert,
+  Linking
+} from 'react-native';
+import { ref, onValue, query, orderByChild } from 'firebase/database';
+import { database } from '../firebase/firebaseConfig';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const AdminUsersScreen = ({ navigation }) => {
-  const [users, setUsers] = useState([]);
+const AdminUsersScreen = () => {
+  const [donations, setDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetchUsers();
+    const fetchDonations = () => {
+      try {
+        const donationsRef = query(ref(database, 'donations'), orderByChild('timestamp'));
+        onValue(donationsRef, (snapshot) => {
+          const donationsData = snapshot.val() || {};
+          const formattedDonations = [];
+          
+          Object.keys(donationsData).forEach(donationId => {
+            const donation = donationsData[donationId];
+            formattedDonations.push({
+              id: donationId,
+              ...donation,
+              userName: donation.userInfo?.name || 'Anonymous',
+              userEmail: donation.userInfo?.email || 'No email'
+            });
+          });
+          
+          setDonations(formattedDonations.reverse());
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error("Error fetching donations:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchDonations();
   }, []);
 
-  const fetchUsers = async () => {
-    const querySnapshot = await getDocs(collection(db, "users"));
-    setUsers(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+  const sendTicketEmail = (donation) => {
+    const subject = `Your Donation Receipt #${donation.id.slice(0, 6)}`;
+    const body = `
+      Dear ${donation.userName},
 
-  const toggleAdminStatus = async (userId, currentStatus) => {
-    try {
-      await updateDoc(doc(db, "users", userId), {
-        isAdmin: !currentStatus
+      Thank you for your generous donation of $${donation.amount}.
+
+      ========================
+      DONATION RECEIPT
+      ========================
+      Transaction ID: ${donation.id}
+      Date: ${new Date(donation.timestamp).toLocaleDateString()}
+      Amount: $${donation.amount}
+      Status: ${donation.status || 'Completed'}
+
+      This email serves as your official receipt for tax purposes.
+
+      Sincerely,
+      Your Organization Team
+    `;
+
+    const mailtoUrl = `mailto:${donation.userEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    Linking.openURL(mailtoUrl)
+      .then(() => console.log('Email client opened'))
+      .catch((err) => {
+        Alert.alert(
+          "Error",
+          "Could not open email client. Please copy this receipt manually:\n\n" + body,
+          [
+            {
+              text: "Copy",
+              onPress: () => {
+                // You would implement clipboard copying here
+                // For example using expo-clipboard:
+                // Clipboard.setString(body);
+                Alert.alert("Copied", "Receipt copied to clipboard");
+              }
+            },
+            { text: "OK" }
+          ]
+        );
       });
-      fetchUsers(); // Refresh the list
-    } catch (error) {
-      console.error("Error updating admin status:", error);
-    }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  const renderDonationItem = ({ item }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Donation #{item.id.slice(0, 6)}</Text>
+        <Text style={styles.cardSubtitle}>${item.amount} • {new Date(item.timestamp).toLocaleDateString()}</Text>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardText}>From: {item.userName}</Text>
+        <Text style={styles.cardText}>Email: {item.userEmail}</Text>
+        <Text style={styles.cardText}>Status: {item.status || 'pending'}</Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.emailButton}
+        onPress={() => sendTicketEmail(item)}
+      >
+        <Ionicons name="mail" size={18} color="white" />
+        <Text style={styles.emailButtonText}>Send Receipt</Text>
+      </TouchableOpacity>
+    </View>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>User Management</Text>
-      
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#95a5a6" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search users..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Donation Management</Text>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#666" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search donations..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
       </View>
 
       <FlatList
-        data={filteredUsers}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.userCard}>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{item.name || 'No name'}</Text>
-              <Text style={styles.userEmail}>{item.email}</Text>
-              <Text style={styles.userType}>
-                {item.isAdmin ? 'Admin' : 'Regular User'}
-              </Text>
-            </View>
-            <TouchableOpacity 
-              style={[
-                styles.adminToggle,
-                item.isAdmin ? styles.adminActive : styles.adminInactive
-              ]}
-              onPress={() => toggleAdminStatus(item.id, item.isAdmin)}
-            >
-              <Text style={styles.adminToggleText}>
-                {item.isAdmin ? 'Revoke Admin' : 'Make Admin'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        data={donations.filter(donation => 
+          donation.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) || 
+          donation.userName.toLowerCase().includes(searchQuery.toLowerCase())
         )}
+        renderItem={renderDonationItem}
+        keyExtractor={item => item.id}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text>No donations found</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -81,71 +158,83 @@ const AdminUsersScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: '#f5f5f5',
+    padding: 16
   },
   header: {
-    fontSize: 22,
+    marginBottom: 20
+  },
+  headerText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#2c3e50'
+    color: '#333',
+    marginBottom: 16
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 15,
-    elevation: 2
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 8,
     fontSize: 16
   },
-  userCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
     elevation: 2
   },
-  userInfo: {
-    flex: 1
+  cardHeader: {
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 8
   },
-  userName: {
-    fontWeight: 'bold',
-    fontSize: 16
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600'
   },
-  userEmail: {
-    color: '#7f8c8d',
+  cardSubtitle: {
+    color: '#666',
     fontSize: 14
   },
-  userType: {
-    fontSize: 12,
-    color: '#3498db',
-    marginTop: 5
+  cardBody: {
+    marginVertical: 8
   },
-  adminToggle: {
-    padding: 8,
-    borderRadius: 5,
-    marginLeft: 10
+  cardText: {
+    color: '#444',
+    marginBottom: 4
   },
-  adminActive: {
-    backgroundColor: '#e74c3c'
+  emailButton: {
+    backgroundColor: '#2196F3',
+    padding: 12,
+    borderRadius: 6,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8
   },
-  adminInactive: {
-    backgroundColor: '#2ecc71'
+  emailButtonText: {
+    color: 'white',
+    marginLeft: 8,
+    fontWeight: '600'
   },
-  adminToggleText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 12
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40
   }
 });
 

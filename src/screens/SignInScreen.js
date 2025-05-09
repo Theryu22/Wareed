@@ -131,49 +131,60 @@ export default function SignInScreen() {
     try {
       setIsLoading(true);
       
-      // Get combined user data
-      const combinedData = await fetchCombinedUserData(user.uid);
+      // Get references to both user and info data
+      const userRef = ref(database, `users/${user.uid}`);
+      const infoRef = ref(database, `Info/${user.uid}`);
       
-      if (!combinedData) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'UserForm' }],
-        });
-        return;
+      // Fetch both data sources in parallel
+      const [userSnapshot, infoSnapshot] = await Promise.all([
+        get(userRef),
+        get(infoRef)
+      ]);
+  
+      // Check if user exists
+      if (!userSnapshot.exists()) {
+        throw new Error("User account not found");
       }
-      
-      // Set user context data
+  
+      // Combine the data
+      const userData = userSnapshot.val();
+      const infoData = infoSnapshot.exists() ? infoSnapshot.val() : {};
+  
+      const combinedData = {
+        ...userData,
+        ...infoData,
+        uid: user.uid
+      };
+  
+      // Update context
       setUserId(user.uid);
       setIsAdmin(combinedData.isAdmin || false);
-      setUserName(combinedData.name || '');
-      setBloodType(combinedData.bloodType || '');
-      setAge(combinedData.age || '');
-      
-      // Navigate based on data completeness and admin status
+      setUserName(combinedData.name || 'غير معرف');
+      setBloodType(combinedData.bloodType || 'غير محدد');
+      setAge(combinedData.age || 'غير محدد');
+  
+      // Determine where to navigate
+      let targetScreen = 'UserForm';
       if (combinedData.isAdmin) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Admin' }],
-        });
+        targetScreen = 'Admin';
       } else if (combinedData.name && combinedData.bloodType && combinedData.age) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp' }],
-        });
-      } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'UserForm' }],
-        });
+        targetScreen = 'MainApp';
       }
-      
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      Alert.alert("Error", "Failed to load user data");
+  
       navigation.reset({
         index: 0,
-        routes: [{ name: 'UserForm' }],
+        routes: [{ name: targetScreen }],
       });
+  
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      Alert.alert(
+        "خطأ", 
+        error.code === 'PERMISSION_DENIED' 
+          ? "لا تملك صلاحية الوصول إلى البيانات" 
+          : "فشل تحميل بيانات المستخدم"
+      );
+      navigation.navigate('UserForm');
     } finally {
       setIsLoading(false);
     }
@@ -264,15 +275,8 @@ export default function SignInScreen() {
                   transform: [{ translateY: slideUpAnim }] 
                 }]}
               >
-                Sign in to <Text style={styles.titleHighlight}>Wareed</Text>
-              </Animated.Text>
-              <Animated.Text 
-                style={[styles.subtitle, { 
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideUpAnim }] 
-                }]}
-              >
-                قم بالتسجيل لسهولة الوصول لحسابك الشخصي في وريد
+                Sign in to <Text style={styles.titleHighlight}>Wareed</Text>{'\n'}
+                سجل دخولك في <Text style={styles.titleHighlight}>وريد</Text>
               </Animated.Text>
             </View>
 
@@ -371,7 +375,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
@@ -395,8 +399,8 @@ const styles = StyleSheet.create({
   },
   headerImg: {
     width: 200,
-    height: 100,
-    marginBottom: 24,
+    height: 150,
+    marginBottom: 0,
   },
   form: {
     width: '100%',
