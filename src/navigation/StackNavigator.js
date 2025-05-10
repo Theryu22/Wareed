@@ -13,7 +13,7 @@ import DonationsScreen from "../screens/DonationsScreen";
 import ContactUsScreen from "../screens/ContactUsScreen";
 import UrgencyDetailsScreen from "../screens/UrgencyDetailsScreen";
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
-import AdminUsersScreen from './src/screens/AdminUsersScreen';
+import CaseManagementScreen from './src/screens/CaseManagementScreen';
 import AdminDonationsScreen from './src/screens/AdminDonationsScreen';
 
 
@@ -51,8 +51,8 @@ export default function StackNavigator() {
         options={{ header: () => null }} // Additional safety
       />
       <Stack.Screen 
-        name="AdminUsersScreen" 
-        component={AdminUsersScreen} 
+        name="CaseManagementScreen" 
+        component={CaseManagementScreen} 
         options={{ header: () => null }} // Additional safety
       />
       <Stack.Screen 

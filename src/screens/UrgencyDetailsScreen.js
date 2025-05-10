@@ -1,39 +1,27 @@
-import React, { useState, useContext } from "react";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, ScrollView } from "react-native";
+import React, { useState, useEffect, useContext } from "react";
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Modal, 
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  Alert
+} from "react-native";
 import { UserContext } from "../context/UserContext";
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { getDatabase, ref, push, set } from 'firebase/database';
-import { auth } from '../firebase/firebaseConfig';
+import { getDatabase, ref, push, set, query, orderByChild, equalTo, onValue } from 'firebase/database';
+import { auth, database } from '../firebase/firebaseConfig';
 import QRCode from 'react-native-qrcode-svg';
-
-const donationRequests = [
-  {
-    id: '1',
-    urgency: 'عاجل جدًا',
-    bloodType: 'O+',
-    location: 'مستشفى الملك خالد، حفر الباطن',
-    description: 'حالة طارئة تتطلب تبرعًا فوريًا.',
-  },
-  {
-    id: '2',
-    urgency: 'عاجل',
-    bloodType: 'A-',
-    location: 'مستشفى حفر الباطن المركزي',
-    description: 'حالة تحتاج إلى تبرع خلال الساعات القادمة.',
-  },
-  {
-    id: '3',
-    urgency: 'عادي',
-    bloodType: 'B+',
-    location: 'مستشفى الولادة والأطفال، حفر الباطن',
-    description: 'حالة يمكن التبرع لها في الأيام القادمة.',
-  },
-];
 
 export default function UrgencyDetailsScreen({ route, navigation }) {
   const { userName, bloodType } = useContext(UserContext);
   const { urgency } = route.params;
   
+  const [donationRequests, setDonationRequests] = useState([]);
   const [isTimeModalVisible, setIsTimeModalVisible] = useState(false);
   const [isTicketModalVisible, setIsTicketModalVisible] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -42,6 +30,37 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
   const [isBookingEnabled, setIsBookingEnabled] = useState(true);
   const [overrideClinicHours, setOverrideClinicHours] = useState(true);
   const [ticketDetails, setTicketDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const fetchDonationRequests = () => {
+      setRefreshing(true);
+      const requestsRef = ref(database, 'donationCases');
+      const queryRef = query(requestsRef, orderByChild('urgency'), equalTo(urgency));
+      
+      onValue(queryRef, (snapshot) => {
+        const requests = [];
+        if (snapshot.exists()) {
+          snapshot.forEach((child) => {
+            requests.push({
+              id: child.key,
+              ...child.val()
+            });
+          });
+        }
+        setDonationRequests(requests);
+        setLoading(false);
+        setRefreshing(false);
+      }, (error) => {
+        console.error("Error fetching requests:", error);
+        setLoading(false);
+        setRefreshing(false);
+      });
+    };
+
+    fetchDonationRequests();
+  }, [urgency]);
 
   const generateTicketCode = () => {
     return Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -102,7 +121,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     const now = new Date();
     
     // Convert to Saudi time (UTC+3)
-    const saudiOffset = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+    const saudiOffset = 3 * 60 * 60 * 1000;
     const saudiTime = new Date(now.getTime() + saudiOffset);
     
     const currentHour = saudiTime.getUTCHours();
@@ -118,7 +137,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
 
   const generateTimeSlots = () => {
     const now = new Date();
-    const saudiOffset = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+    const saudiOffset = 3 * 60 * 60 * 1000;
     const saudiTime = new Date(now.getTime() + saudiOffset);
     
     let currentHour = saudiTime.getUTCHours();
@@ -126,8 +145,8 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     
     const slots = [];
     let startHour = Math.max(currentHour, 8);
-    const endHour = 16; // Clinic closes at 4 PM
-    const interval = 20; // 20 minutes between slots
+    const endHour = 16;
+    const interval = 20;
     
     // Round up to next 20 minute interval
     let firstSlotMinute = Math.ceil(currentMinutes / interval) * interval;
@@ -139,7 +158,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     // Generate time slots in Saudi time
     for (let hour = startHour; hour < endHour; hour++) {
       const startMinute = hour === startHour ? firstSlotMinute : 0;
-      const endMinute = 60; // Generate slots until :40 for each hour
+      const endMinute = 60;
       
       for (let minute = startMinute; minute < endMinute; minute += interval) {
         const period = hour >= 12 ? 'مساءً' : 'صباحًا';
@@ -189,6 +208,14 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#075eec" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -202,7 +229,7 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
       </Text>
       
       <FlatList
-        data={donationRequests.filter(item => item.urgency === urgency)}
+        data={donationRequests}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: getUrgencyColor(item.urgency) }]}>
@@ -221,6 +248,36 @@ export default function UrgencyDetailsScreen({ route, navigation }) {
           </View>
         )}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              const requestsRef = ref(database, 'donationCases');
+              const queryRef = query(requestsRef, orderByChild('urgency'), equalTo(urgency));
+              onValue(queryRef, (snapshot) => {
+                const requests = [];
+                if (snapshot.exists()) {
+                  snapshot.forEach((child) => {
+                    requests.push({
+                      id: child.key,
+                      ...child.val()
+                    });
+                  });
+                }
+                setDonationRequests(requests);
+                setRefreshing(false);
+              });
+            }}
+          />
+        }
+        ListEmptyComponent={
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="water" size={60} color="#ddd" />
+              <Text style={styles.emptyText}>لا توجد حالات متاحة حالياً</Text>
+            </View>
+          )
+        }
       />
 
       {/* Time Selection Modal */}
@@ -348,6 +405,24 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: '#f8f9fa',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#888',
+    marginTop: 20,
+    textAlign: 'center',
   },
   backButton: {
     alignSelf: 'flex-start',

@@ -10,7 +10,7 @@ import {
   RefreshControl
 } from 'react-native';
 import { UserContext } from '../context/UserContext';
-import { ref, query, orderByChild, equalTo, onValue } from 'firebase/database';
+import { ref, query, orderByChild, equalTo, onValue, remove } from 'firebase/database';
 import { database, auth } from '../firebase/firebaseConfig';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import moment from 'moment';
@@ -78,6 +78,35 @@ export default function DonationsScreen({ navigation }) {
     return () => unsubscribe();
   }, [userId]);
 
+  const handleCancelAppointment = (donationId) => {
+    Alert.alert(
+      "إلغاء الموعد",
+      "هل أنت متأكد أنك تريد إلغاء هذا الموعد؟",
+      [
+        {
+          text: "تراجع",
+          style: "cancel"
+        },
+        { 
+          text: "تأكيد الإلغاء", 
+          onPress: () => cancelDonation(donationId),
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
+  const cancelDonation = async (donationId) => {
+    try {
+      const donationRef = ref(database, `donations/${donationId}`);
+      await remove(donationRef);
+      Alert.alert("تم الإلغاء", "تم إلغاء الموعد بنجاح");
+    } catch (error) {
+      console.error("Error canceling donation:", error);
+      Alert.alert("خطأ", "حدث خطأ أثناء محاولة الإلغاء");
+    }
+  };
+
   const getStatusColor = (status) => {
     switch(status) {
       case 'approved': return '#4CAF50';
@@ -96,25 +125,18 @@ export default function DonationsScreen({ navigation }) {
     }
   };
 
-const formatDate = (dateString) => {
-  // Ensure the dateString is valid before formatting
-  if (!dateString) {
-    return "غير محدد";  // Return default if date is invalid
-  }
-  
-  // Parse the date string with moment
-  const parsedDate = moment(dateString);
+  const formatDate = (dateString) => {
+    if (!dateString) {
+      return "غير محدد";
+    }
+    
+    const parsedDate = moment(dateString);
+    if (!parsedDate.isValid()) {
+      return moment().format('DD MMMM YYYY، h:mm a');
+    }
 
-  // Check if the parsed date is valid, otherwise return a default value
-  if (!parsedDate.isValid()) {
-    // Return a default formatted date instead of ISO string
-    return moment().format('DD MMMM YYYY، h:mm a'); // Returns today's date in the preferred format
-  }
-
-  // Format the valid date
-  return parsedDate.format('DD MMMM YYYY، h:mm a');
-};
-
+    return parsedDate.format('DD MMMM YYYY، h:mm a');
+  };
 
   const renderDonationItem = ({ item }) => (
     <View style={styles.card}>
@@ -155,6 +177,16 @@ const formatDate = (dateString) => {
           <Text style={styles.statusText}>الحالة: {item.status}</Text>
         </View>
       </View>
+
+      {item.status === 'pending' && (
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => handleCancelAppointment(item.id)}
+        >
+          <Ionicons name="close-circle" size={20} color="#f44336" />
+          <Text style={styles.cancelButtonText}>إلغاء الموعد</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -274,5 +306,20 @@ const styles = StyleSheet.create({
   emptyListContainer: {
     flex: 1,
     justifyContent: 'center',
+  },
+  cancelButton: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 15,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#f44336',
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    color: '#f44336',
+    fontWeight: 'bold',
+    marginRight: 8,
   },
 });

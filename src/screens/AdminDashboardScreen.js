@@ -38,11 +38,11 @@ const AdminDashboard = ({ navigation }) => {
       screen: "AdminDonationsScreen"
     },
     { 
-      title: "Registered Users", 
+      title: "Create Case", 
       count: users.length,
-      icon: "people",
+      icon: "fitness-outline",
       color: "#2ecc71",
-      screen: "AdminUsersScreen"
+      screen: "CaseManagementScreen"
     },
   ];
 

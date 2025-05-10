@@ -16,7 +16,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ContactUsScreen from './src/screens/ContactUsScreen';
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
-import AdminUsersScreen from './src/screens/AdminUsersScreen';
+import CaseManagementScreen from './src/screens/CaseManagementScreen';
 import AdminDonationsScreen from './src/screens/AdminDonationsScreen';
 
 
@@ -60,7 +60,7 @@ function AdminNavigator() {
     screenOptions={{ drawerPosition: "right", drawerType: "back" }}
     >
       <Drawer.Screen name="AdminDashboardScreen" component={AdminDashboardScreen} />
-      <Drawer.Screen name="AdminUsersScreen" component={AdminUsersScreen} />
+      <Drawer.Screen name="CaseManagementScreen" component={CaseManagementScreen} />
       <Drawer.Screen name="AdminDonationsScreen" component={AdminDonationsScreen} />
     </Drawer.Navigator>
   );
